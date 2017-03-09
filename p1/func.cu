@@ -144,7 +144,8 @@ void allocateMemoryAndCopyToGPU(const size_t numRowsImage, const size_t numColsI
   // Copiar el filtro  (h_filter) a memoria global de la GPU (d_filter)
 
  // checkCudaErrors(cudaMalloc(&d_filter, sizeof(unsigned char) * filterWidth * filterWidth));
-  checkCudaErrors(cudaMemcpyToSymbol(d_const_filter, h_filter, sizeof(unsigned char) * filterWidth * filterWidth));
+  //checkCudaErrors(cudaMemcpyToSymbol(d_const_filter, h_filter, sizeof(unsigned char) * filterWidth * filterWidth));
+  checkCudaErrors(cudaMemcpyToSymbol(d_const_filter, h_filter, sizeof(float) * filterWidth * filterWidth));
  // cudaMemcpy(d_filter, h_filter, sizeof(unsigned char) * filterWidth * filterWidth, cudaMemcpyHostToDevice);//Copiamos el d_filter a GPU.
 
 }
@@ -188,7 +189,7 @@ void create_filter(float **h_filter, int *filterWidth){
   (*h_filter)[15] = 1.; (*h_filter)[16] = -1.; (*h_filter)[17] = -2.; (*h_filter)[18] = -1.; (*h_filter)[19] = 0;
   (*h_filter)[20] = 0; (*h_filter)[21] = 0;   (*h_filter)[22] = -1.; (*h_filter)[23] = 0;   (*h_filter)[24] = 0;*/
   
-  //ESTOS DOS MÉTODOS LOS HE SACADO DE INTERNET Y DAN UN RESULTADO PARECIDO
+  //ESTOS DOS MÉTODOS LOS HE SACADO DE INTERNET Y DAN UN RESULTADO PARECIDO. Se aprecia la eliminación de ruido al hacer zoom! Comprobar con la original
 
   //Filtro de baja frecuencia (paso bajo) = desenfoque, interpolación, eliminación de ruido
   /*(*h_filter)[0] = 1. / 25; (*h_filter)[1] = 1. / 25; (*h_filter)[2] = 1. / 25; (*h_filter)[3] = 1. / 25; (*h_filter)[4] = 1. / 25;
@@ -207,30 +208,56 @@ void create_filter(float **h_filter, int *filterWidth){
   //ESTE MÉTODO LO HE SACADO DE SU PÁGINA Y DEBERÍA SUAVIZAR UN POCO LA IMAGEN
 
   //Filtro paso bajo = suavizado
-  (*h_filter)[0] = 1.; (*h_filter)[1] = 1.; (*h_filter)[2] = 1.; (*h_filter)[3] = 1.; (*h_filter)[4] = 1.;
+  /*(*h_filter)[0] = 1.; (*h_filter)[1] = 1.; (*h_filter)[2] = 1.; (*h_filter)[3] = 1.; (*h_filter)[4] = 1.;
   (*h_filter)[5] = 1.; (*h_filter)[6] = 4.; (*h_filter)[7] = 4.; (*h_filter)[8] = 4.;  (*h_filter)[9] = 1.;
   (*h_filter)[10] = 1.; (*h_filter)[11] = 4.; (*h_filter)[12] = 12.; (*h_filter)[13] = 4.; (*h_filter)[14] = 1.;
   (*h_filter)[15] = 1.; (*h_filter)[16] = 4.; (*h_filter)[17] = 4.; (*h_filter)[18] = 4.; (*h_filter)[19] = 1.;
-  (*h_filter)[20] = 1.; (*h_filter)[21] = 1.; (*h_filter)[22] = 1.; (*h_filter)[23] = 1.; (*h_filter)[24] = 1.;
+  (*h_filter)[20] = 1.; (*h_filter)[21] = 1.; (*h_filter)[22] = 1.; (*h_filter)[23] = 1.; (*h_filter)[24] = 1.;*/
 
   //ESTE TAMBIÉN LO HE CONSEGUIDO DE UNA FUENTE EXTERNA Y EL RESULTADO ES ALOCADO COMO EN EL CASO ANTERIOR
 
-  //Filtro Gaussiano
-  /*(*h_filter)[0] = 1.; (*h_filter)[1] = 4.; (*h_filter)[2] = 7.; (*h_filter)[3] = 4.; (*h_filter)[4] = 1.;
+  //Filtro Gaussiano -> Quedaba mejor con el código mal. El resultado actual no me convence
+  (*h_filter)[0] = 1.; (*h_filter)[1] = 4.; (*h_filter)[2] = 7.; (*h_filter)[3] = 4.; (*h_filter)[4] = 1.;
   (*h_filter)[5] = 4.; (*h_filter)[6] = 20.; (*h_filter)[7] = 33.; (*h_filter)[8] = 20.; (*h_filter)[9] = 4.;
   (*h_filter)[10] = 7.; (*h_filter)[11] = 33.; (*h_filter)[12] = 55.; (*h_filter)[13] = 33.; (*h_filter)[14] = 7.;
   (*h_filter)[15] = 4.; (*h_filter)[16] = 20.; (*h_filter)[17] = 33.; (*h_filter)[18] = 20.; (*h_filter)[19] = 4.;
-  (*h_filter)[20] = 1.; (*h_filter)[21] = 4.; (*h_filter)[22] = 7.; (*h_filter)[23] = 4.; (*h_filter)[24] = 1.;*/
+  (*h_filter)[20] = 1.; (*h_filter)[21] = 4.; (*h_filter)[22] = 7.; (*h_filter)[23] = 4.; (*h_filter)[24] = 1.;
+
+  /*(*h_filter)[0] = 2.; (*h_filter)[1] = 4.; (*h_filter)[2] = 7.; (*h_filter)[3] = 4.; (*h_filter)[4] = 1.;
+  (*h_filter)[5] = 4.; (*h_filter)[6] = 9.; (*h_filter)[7] = 12.; (*h_filter)[8] = 9.; (*h_filter)[9] = 4.;
+  (*h_filter)[10] = 5.; (*h_filter)[11] = 12.; (*h_filter)[12] = 15.; (*h_filter)[13] = 12.; (*h_filter)[14] = 5.;
+  (*h_filter)[15] = 4.; (*h_filter)[16] = 9.; (*h_filter)[17] = 12.; (*h_filter)[18] = 9.; (*h_filter)[19] = 4.;
+  (*h_filter)[20] = 2.; (*h_filter)[21] = 4.; (*h_filter)[22] = 5.; (*h_filter)[23] = 4.; (*h_filter)[24] = 1.;*/
+
 
   //ESTE LO HE SACADO DE SU PÁGINA Y SE VE TODO NEGRO
 
-  //Filtro de nitidez
+  //Filtro de nitidez = No me gusta el resultado.
   /*(*h_filter)[0] = 0; (*h_filter)[1] = -1.; (*h_filter)[2] = -1.; (*h_filter)[3] = -1.; (*h_filter)[4] = 0;
   (*h_filter)[5] = -1.; (*h_filter)[6] = 2.; (*h_filter)[7] = -4.; (*h_filter)[8] = 2.;  (*h_filter)[9] = -1.;
   (*h_filter)[10] = -1.; (*h_filter)[11] = -4.; (*h_filter)[12] = 13.; (*h_filter)[13] = -4.; (*h_filter)[14] = -1.;
   (*h_filter)[15] = -1.; (*h_filter)[16] = 2.; (*h_filter)[17] = -4.; (*h_filter)[18] = 2.; (*h_filter)[19] = -1.;
   (*h_filter)[20] = 0; (*h_filter)[21] = -1.; (*h_filter)[22] = -1.; (*h_filter)[23] = -1.; (*h_filter)[24] = 0;*/
 
+
+  //Detección de bordes
+  /*(*h_filter)[0] = 0.; (*h_filter)[1] = 0.; (*h_filter)[2] = 0.; (*h_filter)[3] = 0.; (*h_filter)[4] = 0.;
+  (*h_filter)[5] = 0.; (*h_filter)[6] = 0.; (*h_filter)[7] = 1.; (*h_filter)[8] = 0.;  (*h_filter)[9] = 0.;
+  (*h_filter)[10] = 0.; (*h_filter)[11] = 1.; (*h_filter)[12] = -4.; (*h_filter)[13] = 1.; (*h_filter)[14] = 0.;
+  (*h_filter)[15] = 0.; (*h_filter)[16] = 0.; (*h_filter)[17] = 1.; (*h_filter)[18] = 0.; (*h_filter)[19] = 0.;
+  (*h_filter)[20] = 0.; (*h_filter)[21] = 0.; (*h_filter)[22] = 0.; (*h_filter)[23] = 0.; (*h_filter)[24] = 0.;*/
+
+  /*(*h_filter)[0] = 0.; (*h_filter)[1] = 0.; (*h_filter)[2] = 0.; (*h_filter)[3] = 0.; (*h_filter)[4] = 0.;
+  (*h_filter)[5] = 0.; (*h_filter)[6] = -1.; (*h_filter)[7] = -1.; (*h_filter)[8] = -1.;  (*h_filter)[9] = 0.;
+  (*h_filter)[10] = 0.; (*h_filter)[11] = -1.; (*h_filter)[12] = 8.; (*h_filter)[13] = -1.; (*h_filter)[14] = 0.;
+  (*h_filter)[15] = 0.; (*h_filter)[16] = -1.; (*h_filter)[17] = -1.; (*h_filter)[18] = -1.; (*h_filter)[19] = 0.;
+  (*h_filter)[20] = 0.; (*h_filter)[21] = 0.; (*h_filter)[22] = 0.; (*h_filter)[23] = 0.; (*h_filter)[24] = 0.;*/
+
+  /*(*h_filter)[0] = 0.; (*h_filter)[1] = 0.; (*h_filter)[2] = 0.; (*h_filter)[3] = 0.; (*h_filter)[4] = 0.;
+  (*h_filter)[5] = 0.; (*h_filter)[6] = -1.; (*h_filter)[7] = 0.; (*h_filter)[8] = 1.;  (*h_filter)[9] = 0.;
+  (*h_filter)[10] = 0.; (*h_filter)[11] = -1.; (*h_filter)[12] = 0.; (*h_filter)[13] = 1.; (*h_filter)[14] = 0.;
+  (*h_filter)[15] = 0.; (*h_filter)[16] = -1.; (*h_filter)[17] = 0.; (*h_filter)[18] = 1.; (*h_filter)[19] = 0.;
+  (*h_filter)[20] = 0.; (*h_filter)[21] = 0.; (*h_filter)[22] = 0.; (*h_filter)[23] = 0.; (*h_filter)[24] = 0.;*/
   //TODO: crear los filtros segun necesidad
   //NOTA: cuidado al establecer el tamaño del filtro a utilizar
 
