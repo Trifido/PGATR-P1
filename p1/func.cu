@@ -188,26 +188,48 @@ void create_filter(float **h_filter, int *filterWidth){
   (*h_filter)[15] = 1.; (*h_filter)[16] = -1.; (*h_filter)[17] = -2.; (*h_filter)[18] = -1.; (*h_filter)[19] = 0;
   (*h_filter)[20] = 0; (*h_filter)[21] = 0;   (*h_filter)[22] = -1.; (*h_filter)[23] = 0;   (*h_filter)[24] = 0;*/
   
-  //Filtro de baja frecuencia (paso bajo) = desenfoque, interpolación, eliminación de ruido
-  /*(*h_filter)[0] = 1 / 25; (*h_filter)[1] = 1 / 25;    (*h_filter)[2] = 1 / 25;  (*h_filter)[3] = 1 / 25;    (*h_filter)[4] = 1 / 25;
-  (*h_filter)[5] = 1 / 25; (*h_filter)[6] = 1 / 25;  (*h_filter)[7] = 1 / 25;  (*h_filter)[8] = 1 / 25;  (*h_filter)[9] = 1 / 25;
-  (*h_filter)[10] = 1 / 25; (*h_filter)[11] = 1 / 25; (*h_filter)[12] = 1 / 25; (*h_filter)[13] = 1 / 25; (*h_filter)[14] = 1 / 25;
-  (*h_filter)[15] = 1 / 25; (*h_filter)[16] = 1 / 25; (*h_filter)[17] = 1 / 25; (*h_filter)[18] = 1 / 25; (*h_filter)[19] = 1 / 25;
-  (*h_filter)[20] = 1 / 25; (*h_filter)[21] = 1 / 25;   (*h_filter)[22] = 1 / 25; (*h_filter)[23] = 1 / 25;   (*h_filter)[24] = 1 / 25;*/
+  //ESTOS DOS MÉTODOS LOS HE SACADO DE INTERNET Y DAN UN RESULTADO PARECIDO
 
+  //Filtro de baja frecuencia (paso bajo) = desenfoque, interpolación, eliminación de ruido
+  /*(*h_filter)[0] = 1. / 25; (*h_filter)[1] = 1. / 25; (*h_filter)[2] = 1. / 25; (*h_filter)[3] = 1. / 25; (*h_filter)[4] = 1. / 25;
+  (*h_filter)[5] = 1. / 25; (*h_filter)[6] = 1. / 25; (*h_filter)[7] = 1. / 25; (*h_filter)[8] = 1. / 25; (*h_filter)[9] = 1. / 25;
+  (*h_filter)[10] = 1. / 25; (*h_filter)[11] = 1. / 25; (*h_filter)[12] = 1. / 25; (*h_filter)[13] = 1. / 25; (*h_filter)[14] = 1. / 25;
+  (*h_filter)[15] = 1. / 25; (*h_filter)[16] = 1. / 25; (*h_filter)[17] = 1. / 25; (*h_filter)[18] = 1. / 25; (*h_filter)[19] = 1. / 25;
+  (*h_filter)[20] = 1. / 25; (*h_filter)[21] = 1. / 25; (*h_filter)[22] = 1. / 25; (*h_filter)[23] = 1. / 25; (*h_filter)[24] = 1. / 25;*/
+  
   //Interpolación ponderada
-  /*(*h_filter)[0] = 1 / 36; (*h_filter)[1] = 1 / 36; (*h_filter)[2] = 1 / 36; (*h_filter)[3] = 1 / 36; (*h_filter)[4] = 1 / 36;
-  (*h_filter)[5] = 1 / 36; (*h_filter)[6] = 2 / 36; (*h_filter)[7] = 2 / 36; (*h_filter)[8] = 2 / 36;  (*h_filter)[9] = 1 / 36;
-  (*h_filter)[10] = 1 / 36; (*h_filter)[11] = 2 / 36; (*h_filter)[12] = 4 / 36; (*h_filter)[13] = 2 / 36; (*h_filter)[14] = 1 / 36;
-  (*h_filter)[15] = 1 / 36; (*h_filter)[16] = 2 / 36; (*h_filter)[17] = 2 / 36; (*h_filter)[18] = 2 / 36; (*h_filter)[19] = 1 / 36;
-  (*h_filter)[20] = 1 / 36; (*h_filter)[21] = 1 / 36; (*h_filter)[22] = 1 / 36; (*h_filter)[23] = 1 / 36; (*h_filter)[24] = 1 / 36;*/
+  /*(*h_filter)[0] = 1. / 36; (*h_filter)[1] = 1. / 36; (*h_filter)[2] = 1. / 36; (*h_filter)[3] = 1. / 36; (*h_filter)[4] = 1. / 36;
+  (*h_filter)[5] = 1. / 36; (*h_filter)[6] = 2. / 36; (*h_filter)[7] = 2. / 36; (*h_filter)[8] = 2. / 36;  (*h_filter)[9] = 1. / 36;
+  (*h_filter)[10] = 1. / 36; (*h_filter)[11] = 2. / 36; (*h_filter)[12] = 4. / 36; (*h_filter)[13] = 2. / 36; (*h_filter)[14] = 1. / 36;
+  (*h_filter)[15] = 1. / 36; (*h_filter)[16] = 2. / 36; (*h_filter)[17] = 2. / 36; (*h_filter)[18] = 2. / 36; (*h_filter)[19] = 1. / 36;
+  (*h_filter)[20] = 1. / 36; (*h_filter)[21] = 1. / 36; (*h_filter)[22] = 1. / 36; (*h_filter)[23] = 1. / 36; (*h_filter)[24] = 1. / 36;*/
+
+  //ESTE MÉTODO LO HE SACADO DE SU PÁGINA Y DEBERÍA SUAVIZAR UN POCO LA IMAGEN
+
+  //Filtro paso bajo = suavizado
+  (*h_filter)[0] = 1.; (*h_filter)[1] = 1.; (*h_filter)[2] = 1.; (*h_filter)[3] = 1.; (*h_filter)[4] = 1.;
+  (*h_filter)[5] = 1.; (*h_filter)[6] = 4.; (*h_filter)[7] = 4.; (*h_filter)[8] = 4.;  (*h_filter)[9] = 1.;
+  (*h_filter)[10] = 1.; (*h_filter)[11] = 4.; (*h_filter)[12] = 12.; (*h_filter)[13] = 4.; (*h_filter)[14] = 1.;
+  (*h_filter)[15] = 1.; (*h_filter)[16] = 4.; (*h_filter)[17] = 4.; (*h_filter)[18] = 4.; (*h_filter)[19] = 1.;
+  (*h_filter)[20] = 1.; (*h_filter)[21] = 1.; (*h_filter)[22] = 1.; (*h_filter)[23] = 1.; (*h_filter)[24] = 1.;
+
+  //ESTE TAMBIÉN LO HE CONSEGUIDO DE UNA FUENTE EXTERNA Y EL RESULTADO ES ALOCADO COMO EN EL CASO ANTERIOR
 
   //Filtro Gaussiano
-  (*h_filter)[0] = 1; (*h_filter)[1] = 4; (*h_filter)[2] = 7; (*h_filter)[3] = 4; (*h_filter)[4] = 1;
-  (*h_filter)[5] = 4; (*h_filter)[6] = 20; (*h_filter)[7] = 33; (*h_filter)[8] = 20;  (*h_filter)[9] = 4;
-  (*h_filter)[10] = 7; (*h_filter)[11] = 33; (*h_filter)[12] = 55; (*h_filter)[13] = 33; (*h_filter)[14] = 7;
-  (*h_filter)[15] = 4; (*h_filter)[16] = 20; (*h_filter)[17] = 33; (*h_filter)[18] = 20; (*h_filter)[19] = 4;
-  (*h_filter)[20] = 1; (*h_filter)[21] = 4; (*h_filter)[22] = 7; (*h_filter)[23] = 4; (*h_filter)[24] = 1;
+  /*(*h_filter)[0] = 1.; (*h_filter)[1] = 4.; (*h_filter)[2] = 7.; (*h_filter)[3] = 4.; (*h_filter)[4] = 1.;
+  (*h_filter)[5] = 4.; (*h_filter)[6] = 20.; (*h_filter)[7] = 33.; (*h_filter)[8] = 20.; (*h_filter)[9] = 4.;
+  (*h_filter)[10] = 7.; (*h_filter)[11] = 33.; (*h_filter)[12] = 55.; (*h_filter)[13] = 33.; (*h_filter)[14] = 7.;
+  (*h_filter)[15] = 4.; (*h_filter)[16] = 20.; (*h_filter)[17] = 33.; (*h_filter)[18] = 20.; (*h_filter)[19] = 4.;
+  (*h_filter)[20] = 1.; (*h_filter)[21] = 4.; (*h_filter)[22] = 7.; (*h_filter)[23] = 4.; (*h_filter)[24] = 1.;*/
+
+  //ESTE LO HE SACADO DE SU PÁGINA Y SE VE TODO NEGRO
+
+  //Filtro de nitidez
+  /*(*h_filter)[0] = 0; (*h_filter)[1] = -1.; (*h_filter)[2] = -1.; (*h_filter)[3] = -1.; (*h_filter)[4] = 0;
+  (*h_filter)[5] = -1.; (*h_filter)[6] = 2.; (*h_filter)[7] = -4.; (*h_filter)[8] = 2.;  (*h_filter)[9] = -1.;
+  (*h_filter)[10] = -1.; (*h_filter)[11] = -4.; (*h_filter)[12] = 13.; (*h_filter)[13] = -4.; (*h_filter)[14] = -1.;
+  (*h_filter)[15] = -1.; (*h_filter)[16] = 2.; (*h_filter)[17] = -4.; (*h_filter)[18] = 2.; (*h_filter)[19] = -1.;
+  (*h_filter)[20] = 0; (*h_filter)[21] = -1.; (*h_filter)[22] = -1.; (*h_filter)[23] = -1.; (*h_filter)[24] = 0;*/
 
   //TODO: crear los filtros segun necesidad
   //NOTA: cuidado al establecer el tamaño del filtro a utilizar
