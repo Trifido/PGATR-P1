@@ -25,19 +25,18 @@ void check(T err, const char* const func, const char* const file, const int line
   if (err != cudaSuccess) {
     std::cerr << "CUDA error at: " << file << ":" << line << std::endl;
     std::cerr << cudaGetErrorString(err) << " " << func << std::endl;
-	system("pause");
+	//system("pause");
     exit(1);
   }
 }
 
 #define TAMFILTRO 5
 #define R 2
-#define BLOCKSIZE 28
-#define SHAREDBLOCKSIZE 32
-__shared__ float sharedMem[SHAREDBLOCKSIZE * SHAREDBLOCKSIZE];
-//__shared__ float sharedRed[BLOCKSIZE * BLOCKSIZE];
-//__shared__ float sharedRed[BLOCKSIZE * BLOCKSIZE];
+#define BLOCKSIZE 32
+#define SHAREDBLOCKSIZE 36
 
+
+//Usamos como memoria constante el filtro de entrada
 __constant__ float d_const_filter[TAMFILTRO*TAMFILTRO];
 
 __global__
@@ -45,42 +44,80 @@ void shared_box_filter(const unsigned char* const inputChannel,
 unsigned char* const outputChannel,
 int numRows, int numCols, const int filterWidth)
 {
-	const int2 thread_2D_pos = make_int2(blockIdx.x * (blockDim.x - 2*R) + threadIdx.x,
-		blockIdx.y * (blockDim.y - 2*R) + threadIdx.y);
+	__shared__ float sharedMem[SHAREDBLOCKSIZE][SHAREDBLOCKSIZE];
+	
+	const int2 thread_2D_pos = make_int2(blockIdx.x * (blockDim.x) + threadIdx.x,
+		blockIdx.y * (blockDim.y) + threadIdx.y);
 
 	const int thread_1D_pos = thread_2D_pos.y * numCols + thread_2D_pos.x;
 
-	/*int sharedPos = (threadIdx.x + R) * SHAREDBLOCKSIZE + (threadIdx.y + R);*/
-	int sharedPos = (threadIdx.x) * SHAREDBLOCKSIZE + (threadIdx.y);
+	int sharedPosX = (threadIdx.x);
+	int sharedPosY = (threadIdx.y);
 
 	if (thread_2D_pos.x >= numCols || thread_2D_pos.y >= numRows)
 		return;
 
-	//if (thread_2D_pos.y - R >= 0 && thread_2D_pos.y + R < numRows && thread_2D_pos.x - R >= 0 && thread_2D_pos.x + R < numCols)
-		sharedMem[sharedPos] = inputChannel[thread_1D_pos];
+	if (sharedPosY == 0){
+		sharedMem[sharedPosY][sharedPosX + 2] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY + 1][sharedPosX + 2] = inputChannel[thread_1D_pos];
+	}
+	else if (sharedPosX == 0){
+		sharedMem[sharedPosY + 2][sharedPosX] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY + 2][sharedPosX + 1] = inputChannel[thread_1D_pos];
+	}
+	else if (sharedPosY == BLOCKSIZE - 1){
+		sharedMem[sharedPosY + 3][sharedPosX + 2] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY + 4][sharedPosX + 2] = inputChannel[thread_1D_pos];
+	}
+	else if (sharedPosX == BLOCKSIZE - 1){
+		sharedMem[sharedPosY + 2][sharedPosX + 3] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY + 2][sharedPosX + 4] = inputChannel[thread_1D_pos];
+	}
+
+	if (sharedPosX == 0 && sharedPosY == 0){
+		sharedMem[sharedPosY][sharedPosX] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY][sharedPosX + 1] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY + 1][sharedPosX] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY + 1][sharedPosX + 1] = inputChannel[thread_1D_pos];
+		
+	}
+	else if (sharedPosX == BLOCKSIZE - 1 && sharedPosY == 0){
+		sharedMem[sharedPosY][sharedPosX + 4] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY][sharedPosX + 3] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY + 1][sharedPosX + 4] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY + 1][sharedPosX + 3] = inputChannel[thread_1D_pos];
+	}
+	else if (sharedPosX == 0 && sharedPosY == BLOCKSIZE - 1){
+		sharedMem[sharedPosY + 4][sharedPosX] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY + 3][sharedPosX] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY + 4][sharedPosX + 1] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY + 3][sharedPosX + 1] = inputChannel[thread_1D_pos];
+	}
+	else if (sharedPosX == BLOCKSIZE - 1 && sharedPosY == BLOCKSIZE - 1){
+		sharedMem[sharedPosY + 4][sharedPosX + 4] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY + 3][sharedPosX + 4] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY + 4][sharedPosX + 3] = inputChannel[thread_1D_pos];
+		sharedMem[sharedPosY + 3][sharedPosX + 3] = inputChannel[thread_1D_pos];
+	}
+		
+	sharedMem[sharedPosY + R][sharedPosX + R] = inputChannel[thread_1D_pos];
 
 	__syncthreads();
 
-	int contador = 0;
+	int posFiltro = 0;
 	float result = 0.0f;
 
-	for (int filter_r = -R; filter_r <= R; ++filter_r){
-		for (int filter_c = -R; filter_c <= R; ++filter_c){
-
-			int image_r = (threadIdx.x) + filter_r;
-			int image_c = (threadIdx.y) + filter_c;
-
-			if ((image_c >= 0) && (image_c < SHAREDBLOCKSIZE) && (image_r >= 0) && (image_r < SHAREDBLOCKSIZE)){
-				float image_value = sharedMem[image_r * SHAREDBLOCKSIZE + image_c];
-				float filter_value = d_const_filter[contador];
-				result += image_value * filter_value;
-			}
-			contador++;
+	//Recorremos las posiciones del filtro
+	for (int filter_r = 0; filter_r <= R * 2; ++filter_r){
+		for (int filter_c = 0; filter_c <= R * 2; ++filter_c){
+			float image_value = sharedMem[sharedPosY + filter_r][sharedPosX + filter_c];
+			float filter_value = d_const_filter[posFiltro];
+			result += image_value * filter_value;
+			posFiltro++;
 		}
 	}
 
-	if (threadIdx.x >= R && threadIdx.x < BLOCKSIZE + R && threadIdx.y >= R && threadIdx.y < BLOCKSIZE + R)
-		outputChannel[thread_1D_pos] = result;
+	outputChannel[thread_1D_pos] = result;
 }
 
 __global__
@@ -96,25 +133,25 @@ void box_filter(const unsigned char* const inputChannel,
 	if (thread_2D_pos.x >= numCols || thread_2D_pos.y >= numRows)
 		return;
 
-	int contador = 0;
+	int posFil = 0;
 	float result = 0.0f;
+
+	//Recorremos las posiciones del filtro
 	for (int filter_r = -filterWidth / 2; filter_r <= filterWidth / 2; ++filter_r){
-		
 		for (int filter_c = -filterWidth / 2; filter_c <= filterWidth / 2; ++filter_c){
 
 			int image_r = thread_2D_pos.y + filter_r;
 			int image_c = thread_2D_pos.x + filter_c;
 
+			//Comprobamos que la posicion del filtro se encuentra dentro de las posiciones de la imagen
 			if ((image_c >= 0) && (image_c < numCols) && (image_r >= 0) && (image_r < numRows)){
-
 				float image_value = inputChannel[image_r * numCols + image_c];
-				float filter_value = d_const_filter[contador];
+				float filter_value = d_const_filter[posFil];
 				result += image_value * filter_value;
 			}
-			contador++;
+			posFil++;
 		}
 	}
-	
 
 	outputChannel[thread_1D_pos] = result;
 }
@@ -137,6 +174,7 @@ void separateChannels(const uchar4* const inputImageRGBA,
 	if (thread_2D_pos.x >= numCols || thread_2D_pos.y >= numRows)
 		return;
 
+	//Separamos en tres canales la imagen
 	int id = thread_1D_pos;
 	redChannel[id] = inputImageRGBA[id].x;
 	greenChannel[id] = inputImageRGBA[id].y;
@@ -206,30 +244,30 @@ void create_filter(float **h_filter, int *filterWidth){
   //create and fill the filter we will convolve with
   *h_filter = new float[KernelWidth * KernelWidth];
   
-  /*
+  
   //Filtro gaussiano: blur
-  const float KernelSigma = 2.;
+  //const float KernelSigma = 2.;
 
-  float filterSum = 0.f; //for normalization
+  //float filterSum = 0.f; //for normalization
 
-  for (int r = -KernelWidth/2; r <= KernelWidth/2; ++r) {
-    for (int c = -KernelWidth/2; c <= KernelWidth/2; ++c) {
-      float filterValue = expf( -(float)(c * c + r * r) / (2.f * KernelSigma * KernelSigma));
-      (*h_filter)[(r + KernelWidth/2) * KernelWidth + c + KernelWidth/2] = filterValue;
-      filterSum += filterValue;
-    }
-  }
+  //for (int r = -KernelWidth/2; r <= KernelWidth/2; ++r) {
+  //  for (int c = -KernelWidth/2; c <= KernelWidth/2; ++c) {
+  //    float filterValue = expf( -(float)(c * c + r * r) / (2.f * KernelSigma * KernelSigma));
+  //    (*h_filter)[(r + KernelWidth/2) * KernelWidth + c + KernelWidth/2] = filterValue;
+  //    filterSum += filterValue;
+  //  }
+  //}
 
-  float normalizationFactor = 1.f / filterSum;
+  //float normalizationFactor = 1.f / filterSum;
 
-  for (int r = -KernelWidth/2; r <= KernelWidth/2; ++r) {
-    for (int c = -KernelWidth/2; c <= KernelWidth/2; ++c) {
-      (*h_filter)[(r + KernelWidth/2) * KernelWidth + c + KernelWidth/2] *= normalizationFactor;
-    }
-  }
-  */
+  //for (int r = -KernelWidth/2; r <= KernelWidth/2; ++r) {
+  //  for (int c = -KernelWidth/2; c <= KernelWidth/2; ++c) {
+  //    (*h_filter)[(r + KernelWidth/2) * KernelWidth + c + KernelWidth/2] *= normalizationFactor;
+  //  }
+  //}
+  
 
-  //Laplaciano 5x5
+  ////Laplaciano 5x5
   (*h_filter)[0] = 0;   (*h_filter)[1] = 0;    (*h_filter)[2] = -1.;  (*h_filter)[3] = 0;    (*h_filter)[4] = 0;
   (*h_filter)[5] = 1.;  (*h_filter)[6] = -1.;  (*h_filter)[7] = -2.;  (*h_filter)[8] = -1.;  (*h_filter)[9] = 0;
   (*h_filter)[10] = -1.;(*h_filter)[11] = -2.; (*h_filter)[12] = 17.; (*h_filter)[13] = -2.; (*h_filter)[14] = -1.;
@@ -238,12 +276,12 @@ void create_filter(float **h_filter, int *filterWidth){
   
   //ESTOS DOS MÉTODOS LOS HE SACADO DE INTERNET Y DAN UN RESULTADO PARECIDO. Se aprecia la eliminación de ruido al hacer zoom! Comprobar con la original
 
-  //Filtro de baja frecuencia (paso bajo) = desenfoque, interpolación, eliminación de ruido
-  /*(*h_filter)[0] = 1. / 25; (*h_filter)[1] = 1. / 25; (*h_filter)[2] = 1. / 25; (*h_filter)[3] = 1. / 25; (*h_filter)[4] = 1. / 25;
-  (*h_filter)[5] = 1. / 25; (*h_filter)[6] = 1. / 25; (*h_filter)[7] = 1. / 25; (*h_filter)[8] = 1. / 25; (*h_filter)[9] = 1. / 25;
-  (*h_filter)[10] = 1. / 25; (*h_filter)[11] = 1. / 25; (*h_filter)[12] = 1. / 25; (*h_filter)[13] = 1. / 25; (*h_filter)[14] = 1. / 25;
-  (*h_filter)[15] = 1. / 25; (*h_filter)[16] = 1. / 25; (*h_filter)[17] = 1. / 25; (*h_filter)[18] = 1. / 25; (*h_filter)[19] = 1. / 25;
-  (*h_filter)[20] = 1. / 25; (*h_filter)[21] = 1. / 25; (*h_filter)[22] = 1. / 25; (*h_filter)[23] = 1. / 25; (*h_filter)[24] = 1. / 25;*/
+  ////Filtro de baja frecuencia (paso bajo) = desenfoque, interpolación, eliminación de ruido
+  //(*h_filter)[0] = 1. / 25; (*h_filter)[1] = 1. / 25; (*h_filter)[2] = 1. / 25; (*h_filter)[3] = 1. / 25; (*h_filter)[4] = 1. / 25;
+  //(*h_filter)[5] = 1. / 25; (*h_filter)[6] = 1. / 25; (*h_filter)[7] = 1. / 25; (*h_filter)[8] = 1. / 25; (*h_filter)[9] = 1. / 25;
+  //(*h_filter)[10] = 1. / 25; (*h_filter)[11] = 1. / 25; (*h_filter)[12] = 1. / 25; (*h_filter)[13] = 1. / 25; (*h_filter)[14] = 1. / 25;
+  //(*h_filter)[15] = 1. / 25; (*h_filter)[16] = 1. / 25; (*h_filter)[17] = 1. / 25; (*h_filter)[18] = 1. / 25; (*h_filter)[19] = 1. / 25;
+  //(*h_filter)[20] = 1. / 25; (*h_filter)[21] = 1. / 25; (*h_filter)[22] = 1. / 25; (*h_filter)[23] = 1. / 25; (*h_filter)[24] = 1. / 25;
   
   //Interpolación ponderada
   /*(*h_filter)[0] = 1. / 36; (*h_filter)[1] = 1. / 36; (*h_filter)[2] = 1. / 36; (*h_filter)[3] = 1. / 36; (*h_filter)[4] = 1. / 36;
@@ -252,8 +290,6 @@ void create_filter(float **h_filter, int *filterWidth){
   (*h_filter)[15] = 1. / 36; (*h_filter)[16] = 2. / 36; (*h_filter)[17] = 2. / 36; (*h_filter)[18] = 2. / 36; (*h_filter)[19] = 1. / 36;
   (*h_filter)[20] = 1. / 36; (*h_filter)[21] = 1. / 36; (*h_filter)[22] = 1. / 36; (*h_filter)[23] = 1. / 36; (*h_filter)[24] = 1. / 36;*/
 
-  //ESTE MÉTODO LO HE SACADO DE SU PÁGINA Y DEBERÍA SUAVIZAR UN POCO LA IMAGEN
-
   //Filtro paso bajo = suavizado
   /*(*h_filter)[0] = 1.; (*h_filter)[1] = 1.; (*h_filter)[2] = 1.; (*h_filter)[3] = 1.; (*h_filter)[4] = 1.;
   (*h_filter)[5] = 1.; (*h_filter)[6] = 4.; (*h_filter)[7] = 4.; (*h_filter)[8] = 4.;  (*h_filter)[9] = 1.;
@@ -261,32 +297,14 @@ void create_filter(float **h_filter, int *filterWidth){
   (*h_filter)[15] = 1.; (*h_filter)[16] = 4.; (*h_filter)[17] = 4.; (*h_filter)[18] = 4.; (*h_filter)[19] = 1.;
   (*h_filter)[20] = 1.; (*h_filter)[21] = 1.; (*h_filter)[22] = 1.; (*h_filter)[23] = 1.; (*h_filter)[24] = 1.;*/
 
-  //ESTE TAMBIÉN LO HE CONSEGUIDO DE UNA FUENTE EXTERNA Y EL RESULTADO ES ALOCADO COMO EN EL CASO ANTERIOR
-
-  //Filtro Gaussiano -> Quedaba mejor con el código mal. El resultado actual no me convence
-  /*(*h_filter)[0] = 1.; (*h_filter)[1] = 4.; (*h_filter)[2] = 7.; (*h_filter)[3] = 4.; (*h_filter)[4] = 1.;
-  (*h_filter)[5] = 4.; (*h_filter)[6] = 20.; (*h_filter)[7] = 33.; (*h_filter)[8] = 20.; (*h_filter)[9] = 4.;
-  (*h_filter)[10] = 7.; (*h_filter)[11] = 33.; (*h_filter)[12] = 55.; (*h_filter)[13] = 33.; (*h_filter)[14] = 7.;
-  (*h_filter)[15] = 4.; (*h_filter)[16] = 20.; (*h_filter)[17] = 33.; (*h_filter)[18] = 20.; (*h_filter)[19] = 4.;
-  (*h_filter)[20] = 1.; (*h_filter)[21] = 4.; (*h_filter)[22] = 7.; (*h_filter)[23] = 4.; (*h_filter)[24] = 1.;*/
-
+  //Filtro Gaussiano
   /*(*h_filter)[0] = 2.; (*h_filter)[1] = 4.; (*h_filter)[2] = 7.; (*h_filter)[3] = 4.; (*h_filter)[4] = 1.;
   (*h_filter)[5] = 4.; (*h_filter)[6] = 9.; (*h_filter)[7] = 12.; (*h_filter)[8] = 9.; (*h_filter)[9] = 4.;
   (*h_filter)[10] = 5.; (*h_filter)[11] = 12.; (*h_filter)[12] = 15.; (*h_filter)[13] = 12.; (*h_filter)[14] = 5.;
   (*h_filter)[15] = 4.; (*h_filter)[16] = 9.; (*h_filter)[17] = 12.; (*h_filter)[18] = 9.; (*h_filter)[19] = 4.;
-  (*h_filter)[20] = 2.; (*h_filter)[21] = 4.; (*h_filter)[22] = 5.; (*h_filter)[23] = 4.; (*h_filter)[24] = 1.;*/
-
-
-  //ESTE LO HE SACADO DE SU PÁGINA Y SE VE TODO NEGRO
-
-  //Filtro de nitidez = No me gusta el resultado.
-  /*(*h_filter)[0] = 0; (*h_filter)[1] = -1.; (*h_filter)[2] = -1.; (*h_filter)[3] = -1.; (*h_filter)[4] = 0;
-  (*h_filter)[5] = -1.; (*h_filter)[6] = 2.; (*h_filter)[7] = -4.; (*h_filter)[8] = 2.;  (*h_filter)[9] = -1.;
-  (*h_filter)[10] = -1.; (*h_filter)[11] = -4.; (*h_filter)[12] = 13.; (*h_filter)[13] = -4.; (*h_filter)[14] = -1.;
-  (*h_filter)[15] = -1.; (*h_filter)[16] = 2.; (*h_filter)[17] = -4.; (*h_filter)[18] = 2.; (*h_filter)[19] = -1.;
-  (*h_filter)[20] = 0; (*h_filter)[21] = -1.; (*h_filter)[22] = -1.; (*h_filter)[23] = -1.; (*h_filter)[24] = 0;*/
-
-  //Este me gusta mucho más
+  (*h_filter)[20] = 2.; (*h_filter)[21] = 4.; (*h_filter)[22] = 5.; (*h_filter)[23] = 4.; (*h_filter)[24] = 1.;
+*/
+  //Filtro de nitidez 
   /*(*h_filter)[0] = -1.; (*h_filter)[1] = -3.; (*h_filter)[2] = -4.; (*h_filter)[3] = -3.; (*h_filter)[4] = -1.;
   (*h_filter)[5] = -3.; (*h_filter)[6] = 0.; (*h_filter)[7] = 6.; (*h_filter)[8] = 0.;  (*h_filter)[9] = -3.;
   (*h_filter)[10] = -4.; (*h_filter)[11] = 6.; (*h_filter)[12] = 21.; (*h_filter)[13] = 6.; (*h_filter)[14] = -4.;
@@ -294,7 +312,7 @@ void create_filter(float **h_filter, int *filterWidth){
   (*h_filter)[20] = -1.; (*h_filter)[21] = -3.; (*h_filter)[22] = -4.; (*h_filter)[23] = -3.; (*h_filter)[24] = -1.;*/
 
   //Detección de bordes
-  /*(*h_filter)[0] = 0.; (*h_filter)[1] = 0.; (*h_filter)[2] = 0.; (*h_filter)[3] = 0.; (*h_filter)[4] = 0.;
+ /* (*h_filter)[0] = 0.; (*h_filter)[1] = 0.; (*h_filter)[2] = 0.; (*h_filter)[3] = 0.; (*h_filter)[4] = 0.;
   (*h_filter)[5] = 0.; (*h_filter)[6] = 0.; (*h_filter)[7] = 1.; (*h_filter)[8] = 0.;  (*h_filter)[9] = 0.;
   (*h_filter)[10] = 0.; (*h_filter)[11] = 1.; (*h_filter)[12] = -4.; (*h_filter)[13] = 1.; (*h_filter)[14] = 0.;
   (*h_filter)[15] = 0.; (*h_filter)[16] = 0.; (*h_filter)[17] = 1.; (*h_filter)[18] = 0.; (*h_filter)[19] = 0.;
@@ -326,21 +344,21 @@ void convolution(const uchar4 * const h_inputImageRGBA, uchar4 * const d_inputIm
                         const int filterWidth)
 {
   //TODO: Calcular tamaños de bloque
-  const dim3 blockSize(SHAREDBLOCKSIZE, SHAREDBLOCKSIZE, 1);
-  const dim3 gridSize((numCols / (blockSize.x - 2 * R)) + 1, (numRows / (blockSize.y - 2 * R)) + 1, 1);
+  const dim3 blockSize(BLOCKSIZE, BLOCKSIZE, 1);
+  //const dim3 gridSize((numCols / (blockSize.x - 2 * R)) + 1, (numRows / (blockSize.y - 2 * R)) + 1, 1);
   const dim3 gridSize1((numCols / (blockSize.x)) + 1, (numRows / (blockSize.y)) + 1, 1);
 
   //TODO: Lanzar kernel para separar imagenes RGBA en diferentes colores
   separateChannels << < gridSize1, blockSize >> >(d_inputImageRGBA, numRows, numCols, d_redFiltered, d_greenFiltered, d_blueFiltered);
 
   //TODO: Ejecutar convolución. Una por canal
-  box_filter << <gridSize1, blockSize >> > (d_redFiltered, d_red, numRows, numCols, filterWidth);
-  box_filter << <gridSize1, blockSize >> > (d_greenFiltered, d_green, numRows, numCols, filterWidth);
-  box_filter << <gridSize1, blockSize >> > (d_blueFiltered, d_blue, numRows, numCols, filterWidth);
-  //Memoria compartida
-  //shared_box_filter << <gridSize, blockSize >> > (d_redFiltered, d_red, numRows, numCols, filterWidth);
-  //shared_box_filter << <gridSize, blockSize >> > (d_greenFiltered, d_green, numRows, numCols, filterWidth);
-  //shared_box_filter << <gridSize, blockSize >> > (d_blueFiltered, d_blue, numRows, numCols, filterWidth);
+  //box_filter << <gridSize1, blockSize >> > (d_redFiltered, d_red, numRows, numCols, filterWidth);
+  //box_filter << <gridSize1, blockSize >> > (d_greenFiltered, d_green, numRows, numCols, filterWidth);
+  //box_filter << <gridSize1, blockSize >> > (d_blueFiltered, d_blue, numRows, numCols, filterWidth);
+  ////Memoria compartida
+  shared_box_filter << <gridSize1, blockSize >> > (d_redFiltered, d_red, numRows, numCols, filterWidth);
+  shared_box_filter << <gridSize1, blockSize >> > (d_greenFiltered, d_green, numRows, numCols, filterWidth);
+  shared_box_filter << <gridSize1, blockSize >> > (d_blueFiltered, d_blue, numRows, numCols, filterWidth);
 
   // Recombining the results. 
   //recombineChannels << <gridSize, blockSize >> >(d_redFiltered, d_greenFiltered, d_blueFiltered, d_outputImageRGBA, numRows, numCols);
